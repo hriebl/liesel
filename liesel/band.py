@@ -1,3 +1,5 @@
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -60,6 +62,33 @@ def to_band(full, bw, lower=True):
         return jnp.flipud(Ab)
 
     return jax.lax.cond(lower, lo, up)
+
+
+@partial(jax.jit, static_argnames="p")
+def to_band_2(full, p, lower=True):
+    """
+    Converts `full` to a `(p + 1) x n` band with bandwidth `p`.
+
+    ## Parameters
+
+    - `full`: A `n x n` matrix.
+    - `p`: The bandwidth `p`.
+    - `lower`: Whether to return the band in lower-diagonal ordered form.
+    """
+
+    n = full.shape[0]
+
+    padded = jnp.hstack([full, jnp.zeros([n, p])])
+
+    def f(i, row):
+        row = jax.lax.dynamic_slice(row, (i,), (bandwidth + 1,))
+        return i + 1, row
+
+    _, band = jax.lax.scan(f, 0, padded)
+
+    band = band.T
+    band = jax.lax.cond(lower, lambda x: x, to_upper, band)
+    return band
 
 
 # no @jax.jit

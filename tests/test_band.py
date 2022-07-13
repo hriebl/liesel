@@ -74,7 +74,8 @@ def test_solve_cholesky(S):
 
 def test_solve_cholesky_permuted(S):
     rhs = sps.rand(1, n, density=1, random_state=42).toarray().flatten()
-    Sb, P = band.permute(S)
+    Sp, P = band.permute(S)
+    Sb = band.to_band(Sp, int(band.bandwidth(Sp)), True)
     assert Sb.shape[0] <= p + 1
     Cb = band.cholesky(Sb)
     x = P.T @ band.backward_sub(Cb, band.forward_sub(Cb, P @ rhs, True), True)

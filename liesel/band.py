@@ -20,52 +20,8 @@ def bandwidth(full):
     return jnp.max(jnp.abs(diff))
 
 
-# @partial(jax.jit, static_argnames="bw")
-def to_band(full, bw, lower=True):
-    """
-    ## Parameters
-
-    - `full`: A full (n x n) matrix.
-    - `bw`: The bandwidth p.
-    - `lower`: Whether to return the (p x n) band in lower-diagonal ordered form.
-    """
-    n = full.shape[0]
-    bw += 1
-
-    # We only access the upper triangular.
-    # If we get a Matrix in lower-triangular (L) form, we convert.
-    full = jnp.where(jnp.array_equal(full, jnp.tril(full)), full.T, full)
-
-    def lo():
-        Ab = jnp.zeros((bw, n))
-        for k in range(bw):
-            Ab = Ab.at[k, : (n - k)].set(jnp.diag(full, k))
-        return Ab
-
-    # def lo():
-    #     return jax.lax.fori_loop(
-    #         0, bw,
-    #         lambda k, Ab: jax.lax.fori_loop(
-    #             0, n,
-    #             lambda i, Ab: Ab.at[k, i].set(
-    #                 full.at[i, i + k].get(mode="fill", fill_value=0)
-    #             ),
-    #             Ab,
-    #         ),
-    #         jnp.zeros((bw, n)),
-    #     )
-
-    def up():
-        Ab = jnp.zeros((bw, n))
-        for k in range(bw):
-            Ab = Ab.at[k, k:].set(jnp.diag(full, k))
-        return jnp.flipud(Ab)
-
-    return jax.lax.cond(lower, lo, up)
-
-
 @partial(jax.jit, static_argnames="p")
-def to_band_2(full, p, lower=True):
+def to_band(full, p, lower=True):
     """
     Converts `full` to a `(p + 1) x n` band with bandwidth `p`.
 
@@ -78,10 +34,14 @@ def to_band_2(full, p, lower=True):
 
     n = full.shape[0]
 
+    # We only access the upper triangular.
+    # If we get a Matrix in lower-triangular (L) form, we convert.
+    full = jnp.where(jnp.array_equal(full, jnp.tril(full)), full.T, full)
+
     padded = jnp.hstack([full, jnp.zeros([n, p])])
 
     def f(i, row):
-        row = jax.lax.dynamic_slice(row, (i,), (bandwidth + 1,))
+        row = jax.lax.dynamic_slice(row, (i,), (p + 1,))
         return i + 1, row
 
     _, band = jax.lax.scan(f, 0, padded)
@@ -92,21 +52,19 @@ def to_band_2(full, p, lower=True):
 
 
 # no @jax.jit
-def permute(full, lower=True):
+def permute(full):
     """
     Permutes `full` with the reverse Cuthill-McKee algorithm and returns the result
-    as a tuple of ((p x n) band, Permuation matrix P).
+    as a tuple of (`full` permuted, Permuation matrix P).
 
     ## Parameters
 
     - `full`: A full, symmetric(!) (n x n) matrix.
-    - `lower`: Whether to return the (p x n) band in lower-diagonal ordered form.
     """
     p = sps.csgraph.reverse_cuthill_mckee(sps.csr_matrix(full), symmetric_mode=True)
     P = np.vstack([np.eye(1, full.shape[0], k) for k in p])
-    fullP = P @ full @ P.T
 
-    return to_band(fullP, bandwidth(fullP), lower), P
+    return full[p, :][:, p], P
 
 
 @jax.jit

@@ -2,7 +2,6 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import scipy.sparse as sps
 
 
@@ -55,16 +54,16 @@ def to_band(full, p, lower=True):
 def permute(full):
     """
     Permutes `full` with the reverse Cuthill-McKee algorithm and returns the result
-    as a tuple of (`full` permuted, Permuation matrix P).
+    as a tuple of (`full` permuted, Permuation vector p).
 
     ## Parameters
 
     - `full`: A full, symmetric(!) (n x n) matrix.
     """
     p = sps.csgraph.reverse_cuthill_mckee(sps.csr_matrix(full), symmetric_mode=True)
-    P = np.vstack([np.eye(1, full.shape[0], k) for k in p])
+    # P = np.vstack([np.eye(1, full.shape[0], k) for k in p])
 
-    return full[p, :][:, p], P
+    return full[p, :][:, p], p
 
 
 @jax.jit

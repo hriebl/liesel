@@ -74,11 +74,11 @@ def test_solve_cholesky(S):
 
 def test_solve_cholesky_permuted(S):
     rhs = sps.rand(1, n, density=1, random_state=42).toarray().flatten()
-    Sp, P = band.permute(S)
+    Sp, idx = band.permute(S)
     Sb = band.to_band(Sp, int(band.bandwidth(Sp)), True)
     assert Sb.shape[0] <= p + 1
     Cb = band.cholesky(Sb)
-    x = P.T @ band.backward_sub(Cb, band.forward_sub(Cb, P @ rhs, True), True)
+    x = band.backward_sub(Cb, band.forward_sub(Cb, rhs[idx], True), True)[idx]
     assert x == approx(linalg.solve(S, rhs, assume_a="pos"), rel=1e-4)
     assert x == approx(
         linalg.solveh_banded(band.to_band(S, p), rhs, lower=True), rel=1e-4
